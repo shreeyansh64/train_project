@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Water Level Telemetry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef3f5;--panel:#fff;--ink:#12262f;--mute:#5b727c;--line:#d5e0e5;--water:#1b7fa8;--water2:#7cc4de;--ok:#1f8a5b;--warn:#c98216;--bad:#c23b3b;--shadow:0 1px 2px rgba(18,38,47,.06)}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1a20;--panel:#14262e;--ink:#e4eef2;--mute:#8aa3ad;--line:#25404b;--water:#3aa3cf;--water2:#2a6f8c;--ok:#4cc38a;--warn:#e3a53b;--bad:#e76a6a;--shadow:none}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 "Schibsted Grotesk",system-ui,sans-serif;padding-top:env(safe-area-inset-top,0)}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;padding:18px 28px;border-bottom:1px solid var(--line);background:var(--panel)}
+h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em}
+h1 small{display:block;font-weight:400;color:var(--mute);font-size:13px}
+.conn{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.conn input{width:290px;max-width:100%}
+.pill{display:inline-flex;gap:7px;align-items:center;font-size:13px;padding:5px 11px;border-radius:99px;border:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mute)}
+.pill.ok .dot{background:var(--ok)}.pill.bad .dot{background:var(--bad)}.pill.wait .dot{background:var(--warn)}
+input,select,button{font:inherit;color:var(--ink)}
+input{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:0}
+input:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+button{background:var(--water);color:#fff;border:0;border-radius:6px;padding:9px 16px;font-weight:600;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:disabled{opacity:.55;cursor:wait}
+main{max-width:1180px;margin:0 auto;padding:24px 28px 48px;display:grid;grid-template-columns:340px 1fr;gap:20px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;box-shadow:var(--shadow);min-width:0}
+.panel h2{font-size:15px;margin:0 0 14px;font-weight:600}
+.tank-wrap{display:flex;gap:20px;align-items:center}
+.tank{position:relative;width:104px;height:230px;border:2px solid var(--ink);border-radius:12px 12px 18px 18px;overflow:hidden;flex:none;background:var(--bg)}
+.water{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(var(--water2),var(--water));transition:height .9s cubic-bezier(.3,.8,.3,1)}
+.water:before{content:"";position:absolute;top:-6px;left:-20%;width:140%;height:12px;border-radius:50%;background:var(--water2);animation:slosh 4s ease-in-out infinite alternate}
+@keyframes slosh{to{transform:translateX(14%)}}
+@media(prefers-reduced-motion:reduce){.water:before{animation:none}.water{transition:none}}
+.tick{position:absolute;right:0;width:14px;border-top:2px solid var(--ink);opacity:.5}
+.big{font-size:44px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.big span{font-size:20px;color:var(--mute);margin-left:2px}
+.sub{color:var(--mute);font-size:13px;margin-top:6px}
+.badge{display:inline-block;margin-top:10px;font-size:13px;font-weight:600;padding:3px 10px;border-radius:5px;color:#fff;background:var(--mute)}
+.badge.ok{background:var(--ok)}.badge.warn{background:var(--warn)}.badge.bad{background:var(--bad)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.stat b{display:block;font-size:19px;font-weight:600}
+.stat span{font-size:13px;color:var(--mute)}
+.right{display:grid;gap:20px;min-width:0}
+.chart-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.chart-head h2{margin:0}
+.ctl{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mute)}
+svg.chart{width:100%;height:220px;display:block}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:620px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;color:var(--mute);font-size:13px}
+td.n{font-family:"JetBrains Mono",monospace;font-size:13px}
+.empty{padding:28px 10px;text-align:center;color:var(--mute)}
+form{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+label{display:grid;gap:4px;font-size:13px;color:var(--mute)}
+label input{width:100%;color:var(--ink)}
+.actions{grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.msg{font-size:13px}.msg.ok{color:var(--ok)}.msg.bad{color:var(--bad)}
+.note{font-size:13px;color:var(--mute);margin:10px 0 0}
+@media(max-width:860px){main{grid-template-columns:1fr;padding:16px}header{padding:14px 16px}.conn input{width:100%}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Water level telemetry<small>Live readings from train-mounted sensors</small></h1>
+  <div class="conn">
+    <input id="base" class="mono" value="https://water-level-sensor.onrender.com" aria-label="API base URL" spellcheck="false">
+    <button class="ghost" id="saveBase">Connect</button>
+    <span class="pill wait" id="status"><span class="dot"></span><span id="statusTxt">Connecting</span></span>
+  </div>
+</header>
+
+<main>
+  <section class="panel" aria-label="Current level">
+    <h2>Current level <span class="mono" style="color:var(--mute);font-weight:400" id="trainId"></span></h2>
+    <div class="tank-wrap">
+      <div class="tank" id="tank" role="img" aria-label="Tank level">
+        <div class="water" id="water"></div>
+        <i class="tick" style="bottom:25%"></i><i class="tick" style="bottom:50%"></i><i class="tick" style="bottom:75%"></i>
+      </div>
+      <div>
+        <div class="big mono" id="pct">--<span>%</span></div>
+        <div class="sub mono" id="mm">-- mm</div>
+        <div class="badge" id="badge">No data</div>
+        <div class="sub" id="ago" style="margin-top:12px">Waiting for first reading</div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b class="mono" id="sTemp">--</b><span>Temperature</span></div>
+      <div class="stat"><b class="mono" id="sPres">--</b><span>Pressure</span></div>
+      <div class="stat"><b class="mono" id="sCur">--</b><span>Loop current</span></div>
+      <div class="stat"><b class="mono" id="sPos">--</b><span>Position</span></div>
+    </div>
+  </section>
+
+  <div class="right">
+    <section class="panel">
+      <div class="chart-head">
+        <h2>Level over time</h2>
+        <div class="ctl">
+          <label style="display:flex;align-items:center;gap:6px">Refresh
+            <select id="interval" style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px">
+              <option value="0">Off</option><option value="5000" selected>5 s</option><option value="15000">15 s</option><option value="60000">1 min</option>
+            </select>
+          </label>
+          <button class="ghost" id="refresh">Refresh now</button>
+        </div>
+      </div>
+      <svg class="chart" id="chart" viewBox="0 0 700 220" preserveAspectRatio="none" role="img" aria-label="Level percent trend"></svg>
+    </section>
+
+    <section class="panel">
+      <h2>Readings</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Time</th><th>Train</th><th>Level</th><th>Level %</th><th>Current</th><th>Pressure</th><th>Temp</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="7" class="empty">No readings yet. Send one below or wait for a sensor to report.</td></tr></tbody>
+      </table></div>
+      <p class="note" id="rawNote" hidden></p>
+    </section>
+
+    <section class="panel">
+      <h2>Send a reading</h2>
+      <form id="form">
+        <label>Train ID<input name="train_id" value="TRAIN-001" required></label>
+        <label>Timestamp<input name="timestamp" id="ts" required></label>
+        <label>Latitude<input name="latitude" type="number" step="any" value="26.9124" required></label>
+        <label>Longitude<input name="longitude" type="number" step="any" value="75.7873" required></label>
+        <label>Level (mm)<input name="level_mm" type="number" step="any" value="750" required></label>
+        <label>Level (%)<input name="level_percent" type="number" step="any" min="0" max="100" value="62.5" required></label>
+        <label>Loop current (mA)<input name="loop_current_ma" type="number" step="any" value="14" required></label>
+        <label>Pressure (hPa)<input name="pressure_hpa" type="number" step="any" value="1008" required></label>
+        <label>Temperature (°C)<input name="temperature_c" type="number" step="any" value="31" required></label>
+        <div class="actions">
+          <button type="submit" id="send">Send reading</button>
+          <button type="button" class="ghost" id="now">Use current time</button>
+          <span class="msg" id="sendMsg" role="status"></span>
+        </div>
+      </form>
+    </section>
+  </div>
+</main>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var base=(function(){try{return localStorage.getItem("wl_base")}catch(e){return null}})()||$("base").value;
+  $("base").value=base;
+  var history=[],timer=null;
+  var LOW=20,HIGH=90;
+
+  function url(p){return $("base").value.replace(/\/+$/,"")+p}
+  function setStatus(kind,txt){var s=$("status");s.className="pill "+kind;$("statusTxt").textContent=txt}
+  function num(v,d){return typeof v==="number"&&isFinite(v)?v.toFixed(d):"--"}
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+  function nowIso(){return new Date().toISOString()}
+  function fmtTime(t){var d=new Date(t);return isNaN(d)?String(t):d.toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"})}
+
+  // Accept an array, an object wrapping an array, or a single reading.
+  function normalize(data){
+    if(typeof data==="string"){try{data=JSON.parse(data)}catch(e){return{rows:[],raw:data}}}
+    if(Array.isArray(data))return{rows:data.filter(isReading)};
+    if(data&&typeof data==="object"){
+      if(isReading(data))return{rows:[data]};
+      for(var k in data){if(Array.isArray(data[k]))return{rows:data[k].filter(isReading)}}
+      return{rows:[],raw:JSON.stringify(data)};
+    }
+    return{rows:[],raw:String(data)};
+  }
+  function isReading(r){return r&&typeof r==="object"&&("level_percent" in r||"level_mm" in r)}
+
+  function merge(rows){
+    var seen={};history.forEach(function(r){seen[r.train_id+"|"+r.timestamp]=1});
+    rows.forEach(function(r){var k=r.train_id+"|"+r.timestamp;if(!seen[k]){history.push(r);seen[k]=1}});
+    history.sort(function(a,b){return new Date(a.timestamp)-new Date(b.timestamp)});
+    history=history.slice(-200);
+  }
+
+  function render(raw){
+    var last=history[history.length-1];
+    var note=$("rawNote");
+    if(raw){note.hidden=false;note.textContent="Server response: "+raw}else note.hidden=true;
+    if(!last){return}
+    var p=Math.max(0,Math.min(100,Number(last.level_percent)||0));
+    $("water").style.height=p+"%";
+    $("pct").innerHTML=num(last.level_percent,1)+"<span>%</span>";
+    $("mm").textContent=num(last.level_mm,0)+" mm";
+    $("trainId").textContent=last.train_id||"";
+    var b=$("badge");
+    if(p<LOW){b.className="badge bad";b.textContent="Low level"}
+    else if(p>HIGH){b.className="badge warn";b.textContent="Near full"}
+    else{b.className="badge ok";b.textContent="Normal"}
+    $("ago").textContent="Reported "+fmtTime(last.timestamp);
+    $("sTemp").textContent=num(last.temperature_c,1)+" °C";
+    $("sPres").textContent=num(last.pressure_hpa,0)+" hPa";
+    $("sCur").textContent=num(last.loop_current_ma,2)+" mA";
+    $("sPos").textContent=num(last.latitude,3)+", "+num(last.longitude,3);
+    var rows=history.slice().reverse().slice(0,50).map(function(r){
+      return "<tr><td>"+esc(fmtTime(r.timestamp))+"</td><td>"+esc(r.train_id)+"</td><td class='n'>"+num(r.level_mm,0)+" mm</td><td class='n'>"+num(r.level_percent,1)+"%</td><td class='n'>"+num(r.loop_current_ma,2)+" mA</td><td class='n'>"+num(r.pressure_hpa,0)+" hPa</td><td class='n'>"+num(r.temperature_c,1)+" °C</td></tr>"}).join("");
+    $("rows").innerHTML=rows;
+    chart();
+  }
+
+  function chart(){
+    var svg=$("chart"),W=700,H=220,pl=36,pb=22,pt=10,pr=10;
+    var pts=history.slice(-60);
+    var g="";
+    [0,25,50,75,100].forEach(function(v){
+      var y=pt+(H-pt-pb)*(1-v/100);
+      g+="<line x1='"+pl+"' x2='"+(W-pr)+"' y1='"+y+"' y2='"+y+"' stroke='var(--line)' stroke-width='1' vector-effect='non-scaling-stroke'/>"+
+         "<text x='4' y='"+(y+4)+"' fill='var(--mute)' font-size='11' font-family='JetBrains Mono,monospace'>"+v+"%</text>";
+    });
+    var ly=pt+(H-pt-pb)*(1-LOW/100);
+    g+="<line x1='"+pl+"' x2='"+(W-pr)+"' y1='"+ly+"' y2='"+ly+"' stroke='var(--bad)' stroke-dasharray='5 4' stroke-width='1' vector-effect='non-scaling-stroke'/>";
+    if(pts.length>1){
+      var xs=function(i){return pl+(W-pl-pr)*i/(pts.length-1)};
+      var ys=function(r){return pt+(H-pt-pb)*(1-Math.max(0,Math.min(100,r.level_percent))/100)};
+      var d=pts.map(function(r,i){return(i?"L":"M")+xs(i).toFixed(1)+" "+ys(r).toFixed(1)}).join(" ");
+      g+="<path d='"+d+" L"+xs(pts.length-1)+" "+(H-pb)+" L"+pl+" "+(H-pb)+"Z' fill='var(--water)' opacity='.14'/>"+
+         "<path d='"+d+"' fill='none' stroke='var(--water)' stroke-width='2.5' stroke-linejoin='round' vector-effect='non-scaling-stroke'/>";
+    }else{
+      g+="<text x='"+W/2+"' y='"+H/2+"' text-anchor='middle' fill='var(--mute)' font-size='13'>Trend appears after two readings</text>";
+    }
+    svg.innerHTML=g;
+  }
+
+  async function load(){
+    $("refresh").disabled=true;
+    try{
+      var res=await fetch(url("/api/v1/telemetry"),{headers:{Accept:"application/json"}});
+      if(!res.ok)throw new Error("HTTP "+res.status);
+      var out=normalize(await res.json());
+      merge(out.rows);render(out.raw);
+      setStatus("ok","Connected");
+    }catch(e){
+      setStatus("bad",/Failed to fetch|NetworkError/i.test(e.message)?"Unreachable or blocked (CORS)":e.message);
+    }
+    $("refresh").disabled=false;
+  }
+
+  function schedule(){
+    clearInterval(timer);
+    var ms=Number($("interval").value);
+    if(ms>0)timer=setInterval(load,ms);
+  }
+
+  $("form").addEventListener("submit",async function(ev){
+    ev.preventDefault();
+    var f=new FormData(ev.target),body={},m=$("sendMsg");
+    f.forEach(function(v,k){body[k]=(k==="train_id"||k==="timestamp")?v:Number(v)});
+    $("send").disabled=true;m.className="msg";m.textContent="Sending…";
+    try{
+      var res=await fetch(url("/api/v1/telemetry"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      var data=await res.json().catch(function(){return null});
+      if(res.status===422){
+        var first=data&&data.detail&&data.detail[0];
+        throw new Error("Rejected: "+(first?first.loc.slice(-1)[0]+" – "+first.msg:"validation error"));
+      }
+      if(!res.ok)throw new Error("HTTP "+res.status);
+      merge([body]);render();
+      m.className="msg ok";m.textContent="Reading sent";
+      $("ts").value=nowIso();
+      load();
+    }catch(e){
+      m.className="msg bad";
+      m.textContent=/Failed to fetch/i.test(e.message)?"Could not reach the API. Check the URL and that CORS is enabled.":e.message;
+    }
+    $("send").disabled=false;
+  });
+
+  $("now").onclick=function(){$("ts").value=nowIso()};
+  $("refresh").onclick=load;
+  $("interval").onchange=schedule;
+  $("saveBase").onclick=function(){try{localStorage.setItem("wl_base",$("base").value)}catch(e){}history=[];setStatus("wait","Connecting");load()};
+  $("ts").value=nowIso();
+  chart();setStatus("wait","Connecting (server may be waking up)");
+  load();schedule();
+})();
+</script>
+</body>
+</html>
